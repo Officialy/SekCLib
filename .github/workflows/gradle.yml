@@ -34,7 +34,7 @@ jobs:
         run: ./gradlew discordupload
       - name: Publish to Maven (If dev or release)
         if: startsWith(github.ref, 'refs/heads/dev/') || startsWith(github.ref, 'refs/tags/')
-        with:
+        env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: ./gradlew publish
