@@ -206,16 +206,30 @@ def reobfArtifact = artifacts.add('default', reobfFile) {
     type 'jar'
     builtBy 'reobfJar'
 }
+
+task srcJar(type: Jar) {
+    build.dependsOn it
+    from sourceSets.main.allSource
+    classifier = 'sources'
+    from file("LICENSE")
+}
+
+task deobfJar(type: Jar) {
+    build.dependsOn it
+    from sourceSets.main.output
+    classifier = 'deobf'
+    from file("LICENSE")
+}
+
 publishing {
     publications {
         mavenJava(MavenPublication) {
             artifact reobfArtifact
+            artifact srcJar
+            artifact deobfJar
         }
     }
     repositories {
-        // This will mean its being built locally.
-        // Set to local in some conditions, or use the publish locally command instead.
-        // mavenLocal()
         maven {
             url "s3://sekwah-maven/"
             authentication {
