@@ -37,9 +37,6 @@ repositories {
     maven {
         url "https://minecraft.curseforge.com/api/maven/"
     }
-    maven {
-        url 'https://www.dogforce-games.com/maven/'
-    }
 }
 
 println('Java: ' + System.getProperty('java.version') + ' JVM: ' + System.getProperty('java.vm.version') + '(' + System.getProperty('java.vendor') + ') Arch: ' + System.getProperty('os.arch'))

@@ -3,6 +3,7 @@ package com.sekwah.sekclib.network.datamanager;
 import com.google.common.collect.Maps;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import net.minecraft.entity.player.ServerPlayerEntity;
 
 import java.util.Map;
 import java.util.concurrent.Callable;

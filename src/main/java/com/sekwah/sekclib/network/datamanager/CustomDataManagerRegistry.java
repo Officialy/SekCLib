@@ -44,12 +44,12 @@ public class CustomDataManagerRegistry {
          *
          * May need to look a bit more at the capability handlers for that.
          */
-        DIMENSION,
+        //DIMENSION,
         /**
          *
          */
-        CHUNK,
-        CUSTOM,
+        //CHUNK,
+        //CUSTOM,
     }
 
 }
