@@ -1,7 +1,16 @@
+import org.apache.http.HttpEntity
+import org.apache.http.client.methods.CloseableHttpResponse
+import org.apache.http.client.methods.HttpPost
+import org.apache.http.entity.ContentType
+import org.apache.http.entity.mime.MultipartEntityBuilder
+import org.apache.http.impl.client.CloseableHttpClient
+import org.apache.http.impl.client.HttpClients
+
 buildscript {
     repositories {
         maven { url = 'https://files.minecraftforge.net/maven' }
         maven { url = "https://repo.spongepowered.org/maven" }
+        maven { url = "https://maven.sekwah.com" }
         maven {url "https://plugins.gradle.org/m2/"}
         // Only temporary
         jcenter()
@@ -11,18 +20,28 @@ buildscript {
         classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '4.1.+', changing: true
         classpath "org.spongepowered:mixingradle:0.7-SNAPSHOT"
         classpath "com.wynprice.cursemaven:CurseMaven:2.1.1"
+        classpath "org.apache.httpcomponents:httpmime:4.5.13"
     }
+}
+plugins {
+    id "com.matthewprenger.cursegradle" version "1.4.0"
 }
 
 apply plugin: 'net.minecraftforge.gradle'
 apply plugin: "java"
-apply plugin: "idea"
 apply plugin: 'eclipse'
 apply plugin: 'maven-publish'
+
+// May be able to remove it
 apply plugin: "org.spongepowered.mixin"
 apply plugin: "com.wynprice.cursemaven"
 
-version = "${project.version}"
+def branch = System.getenv("GITHUB_REF")
+def sha = System.getenv("GITHUB_SHA")
+def isDevBranch = branch == null || (!(branch.startsWith("refs/heads/release/") || branch.startsWith("refs/tags/")))
+
+
+version = "${project.version}${isDevBranch ? '-SNAPSHOT' : ''}"
 group = project.package // http://maven.apache.org/guides/mini/guide-naming-conventions.html
 archivesBaseName = project.archive
 
@@ -51,7 +70,7 @@ minecraft {
     // This is for personal local tests i was doing ignore it ;)
     //mappings channel: 'snapshot', version: '20200706-unofficialtest-1.16.1'
 
-    //accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
+    accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
 
     // makeObfSourceJar = false // an Srg named sources jar is made by default. uncomment this to disable.
 
@@ -67,8 +86,11 @@ minecraft {
             // Recommended logging level for the console
             property 'forge.logging.console.level', 'debug'
 
+            property 'mixin.env.remapRefMap', 'true'
+            property 'mixin.env.refMapRemappingFile', "${buildDir}/createSrgToMcp/output.srg"
+
             mods {
-                sekclib {
+                "${project.modid}" {
                     source sourceSets.main
                 }
             }
@@ -85,7 +107,7 @@ minecraft {
             property 'forge.logging.console.level', 'debug'
 
             mods {
-                sekclib {
+                "${project.modid}" {
                     source sourceSets.main
                 }
             }
@@ -101,10 +123,10 @@ minecraft {
             // Recommended logging level for the console
             property 'forge.logging.console.level', 'debug'
 
-            args '--mod', 'sekclib', '--all', '--output', file('src/generated/resources/')
+            args '--mod', project.modid, '--all', '--output', file('src/generated/resources/')
 
             mods {
-                sekclib {
+                "${project.modid}" {
                     source sourceSets.main
                 }
             }
@@ -121,12 +143,21 @@ configurations {
     }
 }
 
-
 dependencies {
     // Specify the version of Minecraft to use, If this is any group other then 'net.minecraft' it is assumed
     // that the dep is a ForgeGradle 'patcher' dependency. And it's patches will be applied.
     // The userdev artifact is a special name and will get all sorts of transformations applied to it.
     minecraft 'net.minecraftforge:forge:' + "${project.minecraft_version}-${project.forge_version}"
+
+    annotationProcessor 'org.spongepowered:mixin:0.8.2:processor'
+
+    //compile "com.sekwah:SekCLib:${sekclib_version}:deobf"
+    // Trick intellij to allow for better editing in here for the discord task
+    // compile "org.apache.httpcomponents:httpmime:4.5.13"
+
+    // compile fg.deobf("curse.maven:neat:${project.neat_fileid}")
+
+    // compile fg.deobf("curse.maven:hwyla:${project.hwyla_fileid}")
 
     //include('org.ow2.asm:asm-debug-all:5.2')
 
@@ -145,11 +176,12 @@ dependencies {
 }
 
 mixin {
-    add sourceSets.main, "mixins.sekclib.json"
+    add sourceSets.main, "mixins.${project.modid}.refmap.json"
 }
 
 // Example for how to get properties into the manifest for reading by the runtime..
 jar {
+    finalizedBy 'reobfJar'
     classifier = 'universal'
     manifest {
         attributes([
@@ -160,23 +192,9 @@ jar {
                 "Implementation-Version": "${version}",
                 "Implementation-Vendor" :project.vendor,
                 "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
-                "Maven-Artifact": "${group}:${archivesBaseName}:${version}",
+                "MixinConfigs": "mixins.${project.modid}.json"
         ])
     }
-}
-
-task srcJar(type: Jar) {
-    build.dependsOn it
-    from sourceSets.main.allSource
-    classifier = 'sources'
-    from file("LICENSE")
-}
-
-task deobfJar(type: Jar) {
-    build.dependsOn it
-    from sourceSets.main.output
-    classifier = 'deobf'
-    from file("LICENSE")
 }
 
 // Example configuration to allow publishing using the maven-publish task
@@ -190,19 +208,83 @@ def reobfArtifact = artifacts.add('default', reobfFile) {
 }
 publishing {
     publications {
-        SekCLib(MavenPublication) {
-            groupId project.group
-            artifactId project.archivesBaseName
-            version project.version
+        mavenJava(MavenPublication) {
             artifact reobfArtifact
-            artifact srcJar
-            artifact deobfJar
         }
     }
     repositories {
+        // This will mean its being built locally.
+        // Set to local in some conditions, or use the publish locally command instead.
+        // mavenLocal()
         maven {
-            // see https://github.com/InnovativeOnlineIndustries/Titanium/blob/1.16/build.gradle
-            url "file:///${project.projectDir}/mcmodsrepo"
+            url "s3://sekwah-maven/"
+            authentication {
+                awsIm(AwsImAuthentication)
+            }
         }
+    }
+}
+
+/** For pre-releases and testers to be able to try the latest commits if they want.
+ * If the builds start exceeding 8MB then we may want to upload to s3 instead and periodically clear.
+ * TODO possibly add a task that announces when builds are made?
+ * Though add a note that it may take a while for Curse to approve the files.
+ */
+task discordupload {
+    dependsOn(jar)
+    doLast {
+        String discordWebhook = System.getenv("DISCORD_WEBHOOK")
+
+        if(discordWebhook != null) {
+            println("Logging Into Discord")
+
+            CloseableHttpClient httpClient = HttpClients.createDefault()
+            HttpPost uploadFile = new HttpPost(discordWebhook)
+
+            MultipartEntityBuilder builder = MultipartEntityBuilder.create()
+            builder.addTextBody("content", "New automated dev build\n\n" +
+                    "Current Features: <${project.github}/blob/${sha}/CHANGELOG.md>")
+
+            builder.addBinaryBody("file", file(jar.archiveFile).newInputStream(), ContentType.APPLICATION_OCTET_STREAM, jar.archiveName)
+
+            HttpEntity multipart = builder.build()
+
+            uploadFile.setEntity(multipart)
+            CloseableHttpResponse response = httpClient.execute(uploadFile)
+            response.getEntity()
+
+            println("Posted build")
+
+        } else {
+            println("Discord webhook unspecified")
+        }
+    }
+}
+
+tasks.curseforge.enabled = System.getenv("CURSE_API") != null
+
+curseforge {
+    logger.info("Curse api: " + System.getenv("CURSE_API"))
+    if (System.getenv("CURSE_API") != null) {
+        apiKey = System.getenv("CURSE_API")
+    }
+    project {
+        id = project.curse_project_id
+        // TODO add code to reference this but also cut the latest change logs in for the files
+        changelog = "${project.github}/blob/${sha}/CHANGELOG.md"
+        changelogType = 'markdown'
+        releaseType = 'beta'
+        addGameVersion '1.16.1'
+        addGameVersion '1.16.2'
+        addGameVersion '1.16.3'
+        addGameVersion '1.16.4'
+        addGameVersion '1.16.5'
+
+        mainArtifact(jar){
+
+        }
+        //addArtifact sourcesJar
+        //addArtifact deobfJar
+        //addArtifact javadocJar
     }
 }
