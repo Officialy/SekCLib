@@ -26,12 +26,14 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: ./gradlew discordupload
-      - name: Publish to Maven (If dev or release)
+      - name: Configure AWS Credentials
+        if: startsWith(github.ref, 'refs/heads/dev/') || startsWith(github.ref, 'refs/heads/dev/')
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-west-1
+      - name: Publish to Maven (If dev or release)
         if: startsWith(github.ref, 'refs/heads/dev/') || startsWith(github.ref, 'refs/heads/dev/')
         run: ./gradlew publish
       - name: Publish to Curseforge (If tagged)
