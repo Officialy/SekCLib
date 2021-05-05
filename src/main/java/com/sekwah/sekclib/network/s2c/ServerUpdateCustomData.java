@@ -21,15 +21,15 @@ public class ServerUpdateCustomData {
     }
 
     public static void encode(ServerUpdateCustomData msg, PacketBuffer outBuffer) {
-        outBuffer.writeString(msg.uuid);
-        outBuffer.writeString(msg.url);
+        outBuffer.writeUtf(msg.uuid);
+        outBuffer.writeUtf(msg.url);
         outBuffer.writeBoolean(msg.isTransparent);
     }
 
     public static ServerUpdateCustomData decode(PacketBuffer inBuffer) {
 
-        String uuid = inBuffer.readString();
-        String url = inBuffer.readString();
+        String uuid = inBuffer.readUtf();
+        String url = inBuffer.readUtf();
         boolean isTransparent = inBuffer.readBoolean();
 
         return new ServerUpdateCustomData(uuid, url, isTransparent);
