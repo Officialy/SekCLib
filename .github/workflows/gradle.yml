@@ -19,12 +19,6 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 1.8
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-west-1
       - name: Build with Gradle
         run: ./gradlew build
       - name: Upload to Discord (If dev branch)
@@ -33,6 +27,11 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: ./gradlew discordupload
       - name: Publish to Maven (If dev or release)
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-1
         if: startsWith(github.ref, 'refs/heads/dev/') || startsWith(github.ref, 'refs/heads/dev/')
         run: ./gradlew publish
       - name: Publish to Curseforge (If tagged)
